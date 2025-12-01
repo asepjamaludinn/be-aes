@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  HACKER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String
+  phone     String   @unique
+  publicKey String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+}
+
+model Message {
+  id               String   @id @default(uuid())
+  roomId           String
+  encryptedContent String
+  iv               String
+  wrappedKey       String
+  senderId         String
+  sender           User     @relation("SentMessages", fields: [senderId], references: [id])
+  recipientId      String?
+  recipient        User?    @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  createdAt        DateTime @default(now())
+}
