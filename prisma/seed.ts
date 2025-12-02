@@ -42,7 +42,7 @@ async function main() {
       publicKey: null,
     },
   });
-  console.log(`✅ User created: ${normalUser.username} (${normalUser.role})`);
+  console.log(`User created: ${normalUser.username} (${normalUser.role})`);
 }
 
 main()

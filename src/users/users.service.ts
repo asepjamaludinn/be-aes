@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/database.service';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(private prisma: PrismaService) {}
 
   async register(data: RegisterDto) {
@@ -12,7 +13,7 @@ export class UsersService {
     });
 
     if (existingUser) {
-      console.log(`Login existing user: ${existingUser.username}`);
+      this.logger.log(`Login existing user: ${existingUser.username}`);
       return this.prisma.user.update({
         where: { phone: data.phone },
         data: {
@@ -22,7 +23,7 @@ export class UsersService {
       });
     }
 
-    console.log(`Registering new user: ${data.username}`);
+    this.logger.log(`Registering new user: ${data.username}`);
     return this.prisma.user.create({
       data: {
         phone: data.phone,
