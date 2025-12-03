@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBooleanString } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -12,4 +12,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  removeAvatar?: string;
 }

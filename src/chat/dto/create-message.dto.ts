@@ -1,7 +1,7 @@
 import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
 
 export class CreateMessageDto {
-  @IsUUID()
+  @IsString()
   @IsNotEmpty()
   room_id: string;
 
@@ -17,7 +17,7 @@ export class CreateMessageDto {
   @IsNotEmpty()
   wrapped_key: string;
 
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   sender_id: string;
 

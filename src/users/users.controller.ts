@@ -9,7 +9,10 @@ import {
   Patch,
   NotFoundException,
   Headers,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -43,8 +46,13 @@ export class UsersController {
   }
 
   @Patch(':id')
-  async updateUser(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return this.usersService.updateUser(id, body);
+  @UseInterceptors(FileInterceptor('file'))
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.usersService.updateUser(id, body, file);
   }
 
   @Delete(':id')

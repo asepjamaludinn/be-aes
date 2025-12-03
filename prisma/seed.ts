@@ -11,26 +11,28 @@ async function main() {
   const adminPhone = '+62833333333';
   await prisma.user.upsert({
     where: { phone: adminPhone },
-    update: {},
+    update: { isVerified: true },
     create: {
       username: 'System Administrator',
       phone: adminPhone,
       password: hashedPassword,
       role: Role.ADMIN,
       publicKey: 'SYSTEM_ADMIN_KEY_PLACEHOLDER',
+      isVerified: true,
     },
   });
 
   const hackerPhone = '+62822222222';
   await prisma.user.upsert({
     where: { phone: hackerPhone },
-    update: {},
+    update: { isVerified: true },
     create: {
       username: 'Anonymous Hacker',
       phone: hackerPhone,
       password: hashedPassword,
       role: Role.HACKER,
       publicKey: 'HACKER_KEY_PLACEHOLDER',
+      isVerified: true,
     },
   });
 

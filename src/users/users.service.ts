@@ -12,11 +12,23 @@ import { LoginDto } from './dto/login.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import * as bcrypt from 'bcrypt';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
-  constructor(private prisma: PrismaService) {}
+  private supabase: SupabaseClient;
+
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {
+    this.supabase = createClient(
+      process.env.SUPABASE_URL || '',
+      process.env.SUPABASE_KEY || '',
+    );
+  }
 
   async register(data: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -30,7 +42,6 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
-
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
     this.logger.warn(`[MOCK SMS] OTP untuk ${data.phone}: ${otpCode}`);
@@ -58,7 +69,6 @@ export class UsersService {
         },
       });
     }
-
     return { message: 'OTP sent. Please check server logs.' };
   }
 
@@ -68,23 +78,13 @@ export class UsersService {
     });
 
     if (!user) throw new NotFoundException('User not found');
-
-    if (user.isVerified) {
-      return { message: 'Account already verified.' };
-    }
-
-    if (user.otpCode !== data.otp) {
-      throw new BadRequestException(
-        'Invalid OTP Code. Please check server logs.',
-      );
-    }
+    if (user.isVerified) return { message: 'Account already verified.' };
+    if (user.otpCode !== data.otp)
+      throw new BadRequestException('Invalid OTP Code.');
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        isVerified: true,
-        otpCode: null,
-      },
+      data: { isVerified: true, otpCode: null },
     });
 
     this.logger.log(`User Verified: ${user.username}`);
@@ -96,12 +96,8 @@ export class UsersService {
       where: { phone: data.phone },
     });
     if (!user) throw new NotFoundException('User not found');
-
-    if (!user.isVerified) {
-      throw new UnauthorizedException(
-        'Account not verified. Please verify OTP first.',
-      );
-    }
+    if (!user.isVerified)
+      throw new UnauthorizedException('Account not verified.');
 
     const isMatch = await bcrypt.compare(data.password, user.password);
     if (!isMatch) throw new UnauthorizedException('Wrong password');
@@ -111,8 +107,15 @@ export class UsersService {
       data: { publicKey: data.publicKey },
     });
 
+    const payload = { sub: user.id, username: user.username, role: user.role };
+    const accessToken = this.jwtService.sign(payload);
+
     this.logger.log(`User logged in: ${user.username}`);
-    return updatedUser;
+
+    return {
+      ...updatedUser,
+      access_token: accessToken,
+    };
   }
 
   async searchUser(phone: string) {
@@ -128,14 +131,56 @@ export class UsersService {
     });
   }
 
-  async updateUser(id: string, data: UpdateUserDto) {
+  async updateUser(
+    id: string,
+    data: UpdateUserDto,
+    file?: Express.Multer.File,
+  ) {
     const targetUser = await this.prisma.user.findUnique({ where: { id } });
     if (!targetUser) throw new NotFoundException('User not found');
 
-    if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+    let avatarUrl = targetUser.avatarUrl;
+
+    if (file) {
+      const fileExt = file.originalname.split('.').pop();
+      const fileName = `${id}-${Date.now()}.${fileExt}`;
+      const filePath = `public/${fileName}`;
+
+      const { error } = await this.supabase.storage
+        .from('avatars')
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (error) {
+        this.logger.error(`Supabase Upload Error: ${error.message}`);
+        throw new BadRequestException('Failed to upload image');
+      }
+
+      const { data: publicData } = this.supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      avatarUrl = publicData.publicUrl;
+    } else if (data.removeAvatar === 'true') {
+      avatarUrl = null;
     }
-    return this.prisma.user.update({ where: { id }, data });
+
+    const updateData: any = {
+      username: data.username,
+      avatarUrl: avatarUrl,
+    };
+
+    if (data.password) {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      updateData.password = hashedPassword;
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
   }
 
   async getAllUsers() {
@@ -147,6 +192,7 @@ export class UsersService {
         role: true,
         createdAt: true,
         isVerified: true,
+        avatarUrl: true,
       },
       orderBy: { createdAt: 'desc' },
     });
