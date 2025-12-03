@@ -15,13 +15,18 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   username  String
-  phone     String   @unique
+  phone     String  @unique
+  password  String
   publicKey String?
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
+  role      Role    @default(USER)
+  avatarUrl String?
 
+  otpCode    String?
+  isVerified Boolean @default(false)
+
+  createdAt        DateTime  @default(now())
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 }

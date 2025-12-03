@@ -1,4 +1,3 @@
-// src/chat/chat.gateway.ts
 import {
   WebSocketGateway,
   SubscribeMessage,
@@ -28,11 +27,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(private prisma: PrismaService) {}
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    this.logger.log(`🟢 Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`🔴 Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('join_room')
@@ -48,6 +47,47 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleHackerJoin(@ConnectedSocket() client: Socket) {
     client.join('hacker_room');
     this.logger.warn(`⚠️ HACKER ${client.id} monitoring traffic...`);
+  }
+
+  @SubscribeMessage('admin_join')
+  handleAdminJoin(@ConnectedSocket() client: Socket) {
+    client.join('admin_room');
+    this.logger.log(`🛡️ ADMIN ${client.id} start monitoring system.`);
+  }
+
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @SubscribeMessage('hacker_inject_message')
+  async handleHackerInjection(@MessageBody() payload: CreateMessageDto) {
+    this.logger.warn(
+      `⚠️ MITM ATTACK DETECTED: Injection from Hacker to Room ${payload.room_id}`,
+    );
+
+    const fakePayload = {
+      id: crypto.randomUUID(),
+      room_id: payload.room_id,
+      encrypted_content: payload.encrypted_content,
+      iv: payload.iv,
+      wrapped_key: payload.wrapped_key,
+      sender_id: payload.sender_id,
+      sender_name: 'Unknown (Spoofed)',
+      created_at: new Date().toISOString(),
+    };
+
+    this.server.to(payload.room_id).emit('receive_message', fakePayload);
+
+    this.server.to('hacker_room').emit('attack_log', {
+      status: 'INJECTED',
+      target_room: payload.room_id,
+      timestamp: new Date().toISOString(),
+      details: 'Malicious payload delivered to targets.',
+    });
+
+    this.server.to('admin_room').emit('security_alert', {
+      type: 'MITM_INJECTION',
+      severity: 'HIGH',
+      details: `Detected malicious packet injection in Room ${payload.room_id}`,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   @UsePipes(new ValidationPipe({ transform: true }))
@@ -89,9 +129,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ...responsePayload,
         status: 'captured',
       });
+
+      this.server.to('admin_room').emit('traffic_log', {
+        type: 'MESSAGE_EXCHANGE',
+        room_id: payload.room_id,
+        size: payload.encrypted_content.length,
+        timestamp: new Date().toISOString(),
+      });
     } catch (error) {
       this.logger.error(`❌ Database Error: ${error.message}`, error.stack);
-
       throw new WsException('Failed to process message');
     }
   }
