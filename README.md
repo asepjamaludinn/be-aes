@@ -187,15 +187,15 @@ Fitur ini dibuat untuk keamanan siber.
 ```
 
 src/
-├── app.module.ts \# Root Module (Config Global)
-├── main.ts \# Entry Point (CORS, Pipes, Port)
-├── chat/ \# Chat Module
-│ ├── chat.gateway.ts \# WebSocket Logic & MITM
+├── app.module.ts # Root Module (Config Global)
+├── main.ts # Entry Point (CORS, Pipes, Port)
+├── chat/ # Chat Module
+│ ├── chat.gateway.ts # WebSocket Logic & MITM
 │ ├── chat.controller.ts
 │ └── dto/
-├── users/ \# Users Module
-│ ├── users.service.ts \# Business Logic (Auth, OTP)
+├── users/ # Users Module
+│ ├── users.service.ts # Business Logic (Auth, OTP)
 │ ├── users.controller.ts
 │ └── dto/
-└── database/ \# Prisma Module
+└── database/ # Prisma Module
 ```

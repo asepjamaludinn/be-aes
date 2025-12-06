@@ -19,6 +19,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+
 let IS_MITM_ACTIVE = false;
 
 @WebSocketGateway({
@@ -72,7 +73,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('hacker_join')
   handleHackerJoin(@ConnectedSocket() client: Socket) {
     client.join('hacker_room');
-
     client.emit('mitm_status', { active: IS_MITM_ACTIVE });
     this.logger.warn(`⚠️ HACKER ${client.id} joined.`);
   }
@@ -93,6 +93,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  @SubscribeMessage('report_tampering_attempt')
+  handleTamperingReport(
+    @MessageBody() data: { roomId: string; senderId: string; reason: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.error(
+      `🚨 SECURITY ALERT: Tampering detected by client ${client.id} in room ${data.roomId}`,
+    );
+
+    this.server.to('admin_room').emit('security_alert', {
+      timestamp: new Date().toISOString(),
+      details: `Client ${client.id.substring(0, 5)}... reported: ${data.reason}. Potential MITM Attack!`,
+    });
+  }
+
   @UsePipes(new ValidationPipe({ transform: true }))
   @SubscribeMessage('send_message')
   async handleSendMessage(@MessageBody() payload: CreateMessageDto) {
@@ -104,6 +119,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: new Date().toISOString(),
       size: payload.encryptedContent.length,
       roomId: payload.roomId,
+    });
+
+    this.server.to('admin_room').emit('traffic_log', {
+      timestamp: new Date().toISOString(),
+      room_id: payload.roomId,
+      size: payload.encryptedContent.length,
     });
 
     if (IS_MITM_ACTIVE) {
@@ -149,8 +170,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         iv: savedMessage.iv,
         wrappedKey: savedMessage.wrappedKey,
         senderId: savedMessage.senderId,
-        sender_name: savedMessage.sender.username,
-        created_at: savedMessage.createdAt.toISOString(),
+        senderName: savedMessage.sender.username,
+        createdAt: savedMessage.createdAt.toISOString(),
       };
 
       this.server.to(payload.roomId).emit('receive_message', responsePayload);
@@ -158,7 +179,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (payload.recipientId) {
         this.server.to(payload.recipientId).emit('update_conversation_list', {
           ...responsePayload,
-          sender_avatar: savedMessage.sender.avatarUrl,
+          senderAvatar: savedMessage.sender.avatarUrl,
         });
       }
     } catch (error) {
