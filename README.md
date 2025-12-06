@@ -1,3 +1,19 @@
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
+
+<h1 align="center">Encryptly Backend API</h1>
+
+<p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications, customized for <b>Secure Messaging with End-to-End Encryption (E2EE) & MITM Simulation</b>.</p>
+
+<p align="center">
+    <img src="https://img.shields.io/badge/built%20with-NestJS-red" alt="NestJS">
+    <img src="https://img.shields.io/badge/ORM-Prisma-blue" alt="Prisma">
+    <img src="https://img.shields.io/badge/Realtime-Socket.io-black" alt="Socket.io">
+    <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+    <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+</p>
+
 # Encryptly Backend API
 
 **Secure Messaging Platform with End-to-End Encryption (E2EE) & MITM.**
@@ -191,8 +207,4 @@ src/
 │ ├── users.controller.ts
 │ └── dto/
 └── database/ \# Prisma Module
-
-
-
-
 ```
