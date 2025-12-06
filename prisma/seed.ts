@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting seeding...');
+  console.log('Starting seeding...');
 
   const hashedPassword = await bcrypt.hash('123456', 10);
 

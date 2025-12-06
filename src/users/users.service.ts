@@ -14,6 +14,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import * as bcrypt from 'bcrypt';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
@@ -23,10 +24,11 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {
     this.supabase = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_KEY || '',
+      this.configService.get<string>('SUPABASE_URL') || '',
+      this.configService.get<string>('SUPABASE_KEY') || '',
     );
   }
 
@@ -42,9 +44,14 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
+
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    this.logger.warn(`[MOCK SMS] OTP untuk ${data.phone}: ${otpCode}`);
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    this.logger.warn(
+      `[MOCK SMS] OTP untuk ${data.phone}: ${otpCode} (Expires in 5 mins)`,
+    );
 
     if (existing && !existing.isVerified) {
       await this.prisma.user.update({
@@ -54,6 +61,7 @@ export class UsersService {
           password: hashedPassword,
           publicKey: data.publicKey,
           otpCode: otpCode,
+          otpExpiresAt: otpExpiresAt,
         },
       });
     } else {
@@ -65,11 +73,12 @@ export class UsersService {
           publicKey: data.publicKey,
           role: 'USER',
           otpCode: otpCode,
+          otpExpiresAt: otpExpiresAt,
           isVerified: false,
         },
       });
     }
-    return { message: 'OTP sent. Please check server logs.' };
+    return { message: 'OTP sent. Valid for 5 minutes.' };
   }
 
   async verifyOtp(data: VerifyOtpDto) {
@@ -79,12 +88,24 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('User not found');
     if (user.isVerified) return { message: 'Account already verified.' };
-    if (user.otpCode !== data.otp)
+
+    if (user.otpCode !== data.otp) {
       throw new BadRequestException('Invalid OTP Code.');
+    }
+
+    if (!user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      throw new BadRequestException(
+        'OTP has expired. Please register again to get a new code.',
+      );
+    }
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { isVerified: true, otpCode: null },
+      data: {
+        isVerified: true,
+        otpCode: null,
+        otpExpiresAt: null,
+      },
     });
 
     this.logger.log(`User Verified: ${user.username}`);
@@ -112,8 +133,10 @@ export class UsersService {
 
     this.logger.log(`User logged in: ${user.username}`);
 
+    const { password, otpCode, otpExpiresAt, ...safeUser } = updatedUser;
+
     return {
-      ...updatedUser,
+      ...safeUser,
       access_token: accessToken,
     };
   }
@@ -177,10 +200,13 @@ export class UsersService {
       updateData.password = hashedPassword;
     }
 
-    return this.prisma.user.update({
+    const result = await this.prisma.user.update({
       where: { id },
       data: updateData,
     });
+
+    const { password, otpCode, otpExpiresAt, ...safeResult } = result;
+    return safeResult;
   }
 
   async getAllUsers() {

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { PrismaService } from '../database/database.service';
 
 @Controller('api/chat')
@@ -33,14 +33,14 @@ export class ChatController {
 
         return {
           id: msg.roomId,
-          user_1: myUser,
-          user_2: otherUser,
+          user1: myUser,
+          user2: otherUser,
           messages: [
             {
               id: msg.id,
               content: msg.encryptedContent,
-              sender_id: msg.senderId,
-              created_at: msg.createdAt,
+              senderId: msg.senderId,
+              createdAt: msg.createdAt,
             },
           ],
         };
@@ -60,13 +60,13 @@ export class ChatController {
 
     return messages.map((msg) => ({
       id: msg.id,
-      room_id: msg.roomId,
-      encrypted_content: msg.encryptedContent,
+      roomId: msg.roomId,
+      encryptedContent: msg.encryptedContent,
       iv: msg.iv,
-      wrapped_key: msg.wrappedKey,
-      sender_id: msg.senderId,
-      sender_name: msg.sender.username,
-      created_at: msg.createdAt,
+      wrappedKey: msg.wrappedKey,
+      senderId: msg.senderId,
+      senderName: msg.sender.username,
+      createdAt: msg.createdAt,
     }));
   }
 }

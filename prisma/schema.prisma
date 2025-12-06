@@ -23,8 +23,9 @@ model User {
   role      Role    @default(USER)
   avatarUrl String?
 
-  otpCode    String?
-  isVerified Boolean @default(false)
+  otpCode      String?
+  otpExpiresAt DateTime?
+  isVerified   Boolean   @default(false)
 
   createdAt        DateTime  @default(now())
   sentMessages     Message[] @relation("SentMessages")
