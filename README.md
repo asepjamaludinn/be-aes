@@ -14,15 +14,6 @@
     <a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
 </p>
 
-# Encryptly Backend API
-
-**Secure Messaging Platform with End-to-End Encryption (E2EE) & MITM.**
-
-![NestJS](https://img.shields.io/badge/built%20with-NestJS-red)
-![Prisma](https://img.shields.io/badge/ORM-Prisma-blue)
-![Socket.io](https://img.shields.io/badge/Realtime-Socket.io-black)
-![License](https://img.shields.io/badge/license-MIT-green)
-
 ## 📖 Overview
 
 **Encryptly Backend** adalah server relay untuk aplikasi pesan aman yang mengimplementasikan **Hybrid Cryptography (AES-256 + RSA-2048)**. Backend ini dirancang dengan prinsip _Zero-Knowledge Architecture_, di mana server tidak pernah mengetahui isi pesan asli (plaintext) pengguna.
