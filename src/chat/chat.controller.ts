@@ -1,9 +1,31 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Delete } from '@nestjs/common';
 import { PrismaService } from '../database/database.service';
 
 @Controller('api/chat')
 export class ChatController {
   constructor(private readonly prisma: PrismaService) {}
+
+  @Get('logs/system')
+  async getSystemLogs() {
+    const logs = await this.prisma.systemLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      details: log.details,
+      timestamp: log.createdAt,
+      type: log.type,
+    }));
+  }
+
+  @Delete('logs/system')
+  async clearSystemLogs() {
+    await this.prisma.systemLog.deleteMany();
+    return { message: 'All system logs cleared successfully' };
+  }
 
   @Get('conversations/:userId')
   async getUserConversations(@Param('userId') userId: string) {
@@ -48,6 +70,8 @@ export class ChatController {
       .filter(Boolean);
   }
 
+  // Endpoint ini menangkap parameter dinamis :roomId
+  // Diletakkan paling bawah agar tidak memblokir route spesifik seperti 'logs/system'
   @Get(':roomId')
   async getChatHistory(@Param('roomId') roomId: string) {
     const messages = await this.prisma.message.findMany({

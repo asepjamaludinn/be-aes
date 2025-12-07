@@ -80,6 +80,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('admin_join')
   handleAdminJoin(@ConnectedSocket() client: Socket) {
     client.join('admin_room');
+    this.logger.log(`🛡️ Admin joined monitoring channel: ${client.id}`);
   }
 
   @SubscribeMessage('toggle_mitm')
@@ -94,7 +95,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('report_tampering_attempt')
-  handleTamperingReport(
+  async handleTamperingReport(
     @MessageBody() data: { roomId: string; senderId: string; reason: string },
     @ConnectedSocket() client: Socket,
   ) {
@@ -102,9 +103,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `🚨 SECURITY ALERT: Tampering detected by client ${client.id} in room ${data.roomId}`,
     );
 
+    const logDetails = `Client ${client.id.substring(0, 5)}... reported: ${data.reason}. Potential MITM Attack!`;
+
+    const savedLog = await this.prisma.systemLog.create({
+      data: {
+        action: 'MITM_ALERT',
+        details: logDetails,
+        type: 'error',
+      },
+    });
+
     this.server.to('admin_room').emit('security_alert', {
-      timestamp: new Date().toISOString(),
-      details: `Client ${client.id.substring(0, 5)}... reported: ${data.reason}. Potential MITM Attack!`,
+      id: savedLog.id,
+      timestamp: savedLog.createdAt.toISOString(),
+      details: savedLog.details,
     });
   }
 
@@ -121,8 +133,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       roomId: payload.roomId,
     });
 
+    const logDetails = `Msg in Room ${payload.roomId.substring(0, 8)}... (${payload.encryptedContent.length} bytes)`;
+
+    const savedLog = await this.prisma.systemLog.create({
+      data: {
+        action: 'TRAFFIC',
+        details: logDetails,
+        type: 'info',
+      },
+    });
+
     this.server.to('admin_room').emit('traffic_log', {
-      timestamp: new Date().toISOString(),
+      id: savedLog.id,
+      timestamp: savedLog.createdAt.toISOString(),
       room_id: payload.roomId,
       size: payload.encryptedContent.length,
     });

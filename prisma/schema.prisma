@@ -44,3 +44,11 @@ model Message {
   recipient        User?    @relation("ReceivedMessages", fields: [recipientId], references: [id])
   createdAt        DateTime @default(now())
 }
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  action    String
+  details   String
+  type      String   @default("info")
+  createdAt DateTime @default(now())
+}
