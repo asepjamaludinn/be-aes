@@ -5,6 +5,19 @@ import { PrismaService } from '../database/database.service';
 export class ChatController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Get('stats/dashboard')
+  async getDashboardStats() {
+    const totalMessages = await this.prisma.message.count();
+    const totalAttacks = await this.prisma.systemLog.count({
+      where: { type: 'error' },
+    });
+
+    return {
+      messages: totalMessages,
+      attacks: totalAttacks,
+    };
+  }
+
   @Get('logs/system')
   async getSystemLogs() {
     const logs = await this.prisma.systemLog.findMany({
@@ -70,8 +83,6 @@ export class ChatController {
       .filter(Boolean);
   }
 
-  // Endpoint ini menangkap parameter dinamis :roomId
-  // Diletakkan paling bawah agar tidak memblokir route spesifik seperti 'logs/system'
   @Get(':roomId')
   async getChatHistory(@Param('roomId') roomId: string) {
     const messages = await this.prisma.message.findMany({
