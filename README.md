@@ -68,7 +68,7 @@ Sebelum menjalankan aplikasi, pastikan Anda telah menginstal:
 
     Isi variabel berikut di dalam file `.env`:
     - `DATABASE_URL` & `DIRECT_URL`: Dari Dashboard Supabase (Transaction Pooler & Session Mode).
-    - `SUPABASE_URL` & `SUPABASE_KEY`: Dari API Settings Supabase.
+    - `SUPABASE_URL` & `SUPABASE_KEY`: Dari API Settings Supabase (Storage & Auth).
     - `JWT_SECRET`: Generate string acak (contoh: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
     - `FRONTEND_URL`: URL frontend Anda (misal: `http://localhost:3000`).
 
@@ -126,76 +126,108 @@ Base URL: `/api`
 
 ### Users (`/api/users`)
 
-| Method  | Endpoint      | Description                           | Auth Required |
-| :------ | :------------ | :------------------------------------ | :------------ |
-| `POST`  | `/register`   | Mendaftar user baru (Send Public Key) | No            |
-| `POST`  | `/verify-otp` | Verifikasi nomor HP via OTP           | No            |
-| `POST`  | `/login`      | Login user & update Public Key        | No            |
-| `GET`   | `/search`     | Mencari user by Phone (`?phone=...`)  | Yes           |
-| `GET`   | `/:id/key`    | Mengambil Public Key user lain        | Yes           |
-| `PATCH` | `/:id`        | Update profile (Avatar/Username)      | Yes           |
+| Method   | Endpoint      | Description                           | Auth Required | Role Check |
+| :------- | :------------ | :------------------------------------ | :------------ | :--------- |
+| `POST`   | `/register`   | Mendaftar user baru (Send Public Key) | No            | -          |
+| `POST`   | `/verify-otp` | Verifikasi nomor HP via OTP           | No            | -          |
+| `POST`   | `/login`      | Login user & update Public Key        | No            | -          |
+| `GET`    | `/search`     | Mencari user by Phone (`?phone=...`)  | Yes           | -          |
+| `GET`    | `/:id/key`    | Mengambil Public Key user lain        | Yes           | -          |
+| `GET`    | `/`           | Mengambil list semua user (terdaftar) | Yes           | -          |
+| `PATCH`  | `/:id`        | Update profile (Avatar/Username)      | Yes           | -          |
+| `DELETE` | `/:id`        | Menghapus user secara permanen        | Yes           | ADMIN Only |
 
-### Chat (`/api/chat`)
+### Chat & System Logs (`/api/chat`)
 
-| Method | Endpoint                 | Description                      | Auth Required |
-| :----- | :----------------------- | :------------------------------- | :------------ |
-| `GET`  | `/conversations/:userId` | List history chat user           | Yes           |
-| `GET`  | `/:roomId`               | Mengambil semua pesan dalam room | Yes           |
+| Method   | Endpoint                 | Description                             | Auth Required |
+| :------- | :----------------------- | :-------------------------------------- | :------------ |
+| `GET`    | `/conversations/:userId` | List history chat user                  | Yes           |
+| `GET`    | `/:roomId`               | Mengambil semua pesan dalam room        | Yes           |
+| `GET`    | `/stats/dashboard`       | **Admin:** Statistik pesan & serangan   | Yes           |
+| `GET`    | `/logs/system`           | **Admin:** Mengambil log aktivitas/MITM | Yes           |
+| `DELETE` | `/logs/system`           | **Admin:** Menghapus semua log sistem   | Yes           |
 
 ---
 
 ## WebSocket Events (Socket.io)
 
-Digunakan untuk komunikasi realtime dan fitur MITM.
+Digunakan untuk komunikasi realtime, monitoring admin, dan fitur MITM.
 
 ### Client Emits (Frontend -> Backend)
+
+#### **General Events**
 
 - `join_room`: `{ roomId: string }`
   - Masuk ke room spesifik untuk mendengarkan pesan.
 - `send_message`: `CreateMessageDto`
   - Mengirim pesan terenkripsi. Payload mencakup `encryptedContent`, `iv`, `wrappedKey`.
+- `report_tampering_attempt`: `{ roomId, senderId, reason }`
+  - **Security:** Melapor ke server jika client mendeteksi pesan telah dimodifikasi (signature mismatch/decryption fail).
+
+#### **Admin & Hacker Events**
+
 - `hacker_join`: `(void)`
-  - (Khusus Hacker) Masuk ke dashboard monitoring.
+  - Masuk ke dashboard monitoring (Hacker Room).
+- `admin_join`: `(void)`
+  - Masuk ke dashboard monitoring logs (Admin Room).
 - `toggle_mitm`: `{ active: boolean }`
   - (Khusus Hacker) Mengaktifkan/mematikan intersepsi pesan.
+- `hacker_forward_message`: `CreateMessageDto`
+  - (Khusus Hacker) Meneruskan pesan yang ditahan (baik asli maupun yang sudah dimodifikasi) ke penerima.
 
 ### Client Listens (Backend -> Frontend)
 
 - `receive_message`: `MessageObject`
   - Menerima pesan baru secara realtime.
+- `update_conversation_list`: `MessageObject + senderAvatar`
+  - Notifikasi realtime untuk memperbarui list percakapan di sidebar.
 - `mitm_status`: `{ active: boolean }`
-  - Status apakah mode serangan sedang aktif.
+  - Status apakah mode serangan MITM sedang aktif.
 - `intercepted_packet`: `MessageObject`
   - (Khusus Hacker) Menerima paket yang ditahan server saat MITM aktif.
+- `metadata_log`: `{ sender, recipient, size, timestamp }`
+  - (Khusus Hacker) Log metadata trafik yang lewat.
+- `security_alert`: `{ id, details, timestamp }`
+  - (Khusus Admin) Peringatan realtime jika ada laporan tampering dari user.
+- `traffic_log`: `{ id, room_id, size }`
+  - (Khusus Admin) Log aktivitas pesan normal.
 
 ---
 
-## Man-In-The-Middle (MITM) Simulation
+## Man-In-The-Middle (MITM) Simulation Flow
 
-Fitur ini dibuat untuk keamanan siber.
+Fitur ini dibuat untuk simulasi keamanan siber.
 
-1.  Login sebagai **Hacker**.
-2.  Aktifkan toggle **"Intercept Traffic"**.
-3.  Saat User A mengirim pesan ke User B, server akan **menahan** pesan tersebut (tidak masuk DB, tidak diteruskan ke B).
-4.  Pesan akan muncul di Dashboard Hacker.
-5.  Hacker dapat mencoba membaca (gagal jika enkripsi kuat) atau memodifikasi paket sebelum diteruskan (Tampering).
+1.  **Intercept (Hacker):**
+    - Hacker mengaktifkan toggle **"Intercept Traffic"**.
+    - Server mengaktifkan flag `IS_MITM_ACTIVE`.
+2.  **Hold (Server):**
+    - User A mengirim pesan ke User B.
+    - Server mendeteksi flag aktif, **menahan** pesan, dan menyimpannya di memori sementara.
+    - Pesan di-emit ke Hacker via event `intercepted_packet`.
+3.  **Tamper (Hacker):**
+    - Hacker melihat pesan terenkripsi di dashboard.
+    - Hacker bisa memodifikasi payload (`encryptedContent`) lalu mengirim event `hacker_forward_message`.
+4.  **Detect (User B):**
+    - User B menerima pesan yang sudah dimodifikasi.
+    - Client User B mencoba mendekripsi. Jika integritas rusak (atau HMAC salah), client mengirim `report_tampering_attempt`.
+    - Server mencatat laporan ini sebagai `security_alert` di dashboard Admin.
 
 ---
 
 ## Project Structure
 
-```
-
+```bash
 src/
-├── app.module.ts # Root Module (Config Global)
-├── main.ts # Entry Point (CORS, Pipes, Port)
-├── chat/ # Chat Module
-│ ├── chat.gateway.ts # WebSocket Logic & MITM
-│ ├── chat.controller.ts
-│ └── dto/
-├── users/ # Users Module
-│ ├── users.service.ts # Business Logic (Auth, OTP)
-│ ├── users.controller.ts
-│ └── dto/
-└── database/ # Prisma Module
+├── app.module.ts            # Root Module (Config Global)
+├── main.ts                  # Entry Point (CORS, Pipes, Port)
+├── chat/                    # Chat Module
+│   ├── chat.gateway.ts      # WebSocket Logic (MITM & Realtime)
+│   ├── chat.controller.ts   # Chat History & Admin Logs/Stats
+│   └── dto/
+├── users/                   # Users Module
+│   ├── users.service.ts     # Business Logic (Auth, OTP, CRUD)
+│   ├── users.controller.ts  # REST Endpoints User
+│   └── dto/
+└── database/                # Prisma Module
 ```
