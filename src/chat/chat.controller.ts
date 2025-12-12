@@ -1,4 +1,10 @@
-import { Controller, Get, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Delete,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/database.service';
 
 @Controller('api/chat')
@@ -38,6 +44,23 @@ export class ChatController {
   async clearSystemLogs() {
     await this.prisma.systemLog.deleteMany();
     return { message: 'All system logs cleared successfully' };
+  }
+
+  @Delete('room/:roomId')
+  async deleteChatHistory(@Param('roomId') roomId: string) {
+    const count = await this.prisma.message.count({
+      where: { roomId },
+    });
+
+    if (count === 0) {
+      throw new NotFoundException('Chat history not found or already empty');
+    }
+
+    await this.prisma.message.deleteMany({
+      where: { roomId },
+    });
+
+    return { message: 'Chat history deleted successfully' };
   }
 
   @Get('conversations/:userId')
